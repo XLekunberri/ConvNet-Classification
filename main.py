@@ -1,13 +1,16 @@
 import os
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from scipy.misc import imresize
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import keras
+from math import sqrt
+
 
 # Number of images to use
-n_img = 10000
+train_size = 100
+test_size = 100
 
 # Desired shape of input. Initial shape: 424x424
 shape_x, shape_y = 120, 120
@@ -72,70 +75,69 @@ def main():
     solutions = "training/training_solutions.csv"
 
     # Read data from imagesc
-    df = pd.read_csv(solutions, index_col=0, header=0, nrows=n_img)
+    df = pd.read_csv(solutions, index_col=0, header=0, nrows=train_size)
 
     # Set the indices as labels of type=str
     df.index = df.index.map(str)
-
-    X = tf.placeholder(tf.float32, shape=[None, 212, 212, 3], name="X")
 
     img = mpimg.imread(os.path.join("training/images", "100008.jpg"))[:, :, :channels]
 
     new_img = resize_image(img)
 
+    """
     plt.imshow(new_img)
     plt.axis("off")
     plt.show()
+    """
 
     # Input layer
     # input_layer = tf.reshape(features["x"], [-1, shape_x, shape_y, channels])
 
-    with tf.name_scope("CNN"):
 
-        """Convolutional layers"""
-        # Layer 1
-        conv1 = tf.layers.conv2d(input_layer, filters=48, kernel_size=[5, 5], strides=[1, 1],
-                                 padding='same', name='conv1', activation=tf.nn.relu)
+    # Build the network
+    model = keras.Sequential()
 
-        pool1 = tf.layers.max_pooling2d(norm1, pool_size=[3, 3], strides=[3, 3], name='pool1')
+    model.add(keras.layers.Convolution2D(48,  [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
 
-        # Layer 2
-        conv2 = tf.layers.conv2d(pool1, filters=96, kernel_size=[5, 5], strides=[1, 1],
-                                 padding='same', name='conv2', activation=tf.nn.relu)
+    model.add(keras.layers.Convolution2D(96,  [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
+    model.add(keras.layers.MaxPooling2D([2, 2], [2, 2]))
 
-        pool2 = tf.layers.max_pooling2d(conv2, pool_size=[2, 2], strides=[2, 2], name='pool2')
+    model.add(keras.layers.Convolution2D(192, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
 
-        # Layer 3
-        conv3 = tf.layers.conv2d(pool2, filters=192, kernel_size=[3, 3], strides=[1, 1],
-                                 padding='same', name='conv3', activation=tf.nn.relu)
+    model.add(keras.layers.Convolution2D(192, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
 
-        # Layer 4
-        conv4 = tf.layers.conv2d(conv3, filters=192, kernel_size=[3, 3], strides=[1, 1],
-                                 padding='same', name='conv4', activation=tf.nn.relu)
+    model.add(keras.layers.Convolution2D(384, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
 
-        # Layer 5
-        conv5 = tf.layers.conv2d(conv4, filters=384, kernel_size=[3, 3], strides=[1, 1],
-                                 padding='same', name='conv5', activation=tf.nn.relu)
+    model.add(keras.layers.Convolution2D(384, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
 
-        # Layer 6
-        conv6 = tf.layers.conv2d(pool1, filters=96, kernel_size=[3, 3], strides=[1, 1],
-                                 padding='same', name='conv6', activation=tf.nn.relu)
+    model.add(keras.layers.Dense(2048, activation='relu'))
+    model.add(keras.layers.Dropout(0.5))
 
-        pool6 = tf.layers.max_pooling2d(conv6, pool_size=[3, 3], strides=[3, 3], name='pool6')
+    model.add(keras.layers.Dense(2048, activation='relu'))
+    model.add(keras.layers.Dropout(0.5))
 
-        """Fully conected layers"""
-        # Layer 7
-        full7 = tf.layers.dense(pool6, units=4*4, name='full7')
+    model.add(keras.layers.Dense(2048, activation='relu'))
 
-        drop7 = tf.layers.dropout(full7, rate=0.5, name='drop7')
+    sgd = keras.optimizers.SGD(lr=0.1)
+    def rmse(y_true, y_pred):
 
-        # Layer 8
-        full8 = tf.layers.dense(drop7, units=1*1, name='full8')
+        # sqrt((1 / test_size) * [error for error )
+        """
+        :param y_true: Actual value
+        :param y_pred: Predicted value
+        :return: The Root Mean Squared Error of the labels
+        """
 
-        drop8 = tf.layers.dropout(full8, rate=0.5, name='drop8')
+    model.compile(loss='mean_squared_error', optimizer=sgd)
 
-        # Layer 8
-        logits = tf.layers.dense(drop8, units=1*1, name='out')
+
+    # shuffle=True because it seems to get better results
+    #model.fit(shuffle=True)
+
+
+
 
 
 
