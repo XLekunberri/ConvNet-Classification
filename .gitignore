@@ -1,5 +1,7 @@
 .idea/
-training/images/*.jpg
+data/test/*.jpg
+data/training/*.jpg
+
 node_modules/
 
 
