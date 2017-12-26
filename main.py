@@ -5,14 +5,20 @@ from scipy.misc import imresize
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import keras
+import glob
 
 # Number of images to use
-train_size = 100
+training_size = 100
+training_path = "data/training/"
 test_size = 100
 
 # Desired shape of input. Initial shape: 424x424
-shape_x, shape_y = 120, 120
+shape_x, shape_y = 424, 424
 channels = 3
+
+
+def ls(path):
+    return glob.glob(os.path.join(path, "*.jpg"))
 
 
 def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.2):
@@ -58,28 +64,31 @@ def create_model():
     # Build the network
     model = keras.Sequential()
 
-    model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
-    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
+    model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu', name='conv1'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3], name='pool1'))
 
-    model.add(keras.layers.Convolution2D(96, [5, 5], activation='relu'))
-    model.add(keras.layers.MaxPooling2D([2, 2], [2, 2]))
+    model.add(keras.layers.Convolution2D(96, [5, 5], activation='relu', name='conv2'))
+    model.add(keras.layers.MaxPooling2D([2, 2], [2, 2], name='pool2'))
 
-    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu'))
+    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu', name='conv3'))
 
-    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu'))
+    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu', name='conv4'))
 
-    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu'))
+    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu', name='conv5'))
 
-    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu'))
-    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
+    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu', name='conv6'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3], name='pool6'))
 
-    model.add(keras.layers.Dense(2048, activation='relu'))
-    model.add(keras.layers.Dropout(0.5))
+    model.add(keras.layers.Dense(2048, activation='relu', name='dense7'))
+    model.add(keras.layers.Dropout(0.5, name='drop7'))
 
-    model.add(keras.layers.Dense(2048, activation='relu'))
-    model.add(keras.layers.Dropout(0.5))
+    model.add(keras.layers.Dense(2048, activation='relu', name='dense8'))
+    model.add(keras.layers.Dropout(0.5, name='drop8'))
 
-    model.add(keras.layers.Dense(37, activation='relu'))
+    model.add(keras.layers.Flatten())
+
+    model.add(keras.layers.Dense(37, activation='relu', name='dense9'))
+
 
     sgd = keras.optimizers.SGD(lr=0.1)
     model.compile(loss='mean_squared_error', optimizer=sgd)
@@ -132,8 +141,6 @@ def create_label(dataframe, i, j, name='ShapeLabel', showDistr=False):
 
     return dataframe
 
-
-
 """
 List of names of images
 list(df.index.values)
@@ -158,8 +165,22 @@ def main():
     df.index = df.index.map(str)
 
     img = mpimg.imread(os.path.join("data/training", "100008.jpg"))[:, :, :channels]
+    # new_img = resize_image(img)
 
-    new_img = resize_image(img)
+
+    X, Y = [], []
+    for name in df.index.values[:3]:
+        image = mpimg.imread(os.path.join("data/training", name + ".jpg"))[:, :, :channels]
+        X.append(image)
+
+        Y.append(df.loc[name].values)
+
+    X = np.asarray(X)
+    Y = np.asarray(Y)
+
+    network = create_model()
+
+    network.fit(X, Y)
 
 
 
@@ -171,7 +192,7 @@ def main():
     plt.show()
     """
 
-    network = create_model()
+
 
 
 
