@@ -169,7 +169,7 @@ def main():
 
 
     X, Y = [], []
-    for name in df.index.values[:3]:
+    for name in df.index.values[:training_size]:
         image = mpimg.imread(os.path.join("data/training", name + ".jpg"))[:, :, :channels]
         X.append(image)
 
@@ -180,7 +180,7 @@ def main():
 
     network = create_model()
 
-    network.fit(X, Y)
+    network.fit(X, Y, batch_size=int(training_size/4), )
 
 
 
