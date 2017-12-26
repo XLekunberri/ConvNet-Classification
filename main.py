@@ -5,8 +5,6 @@ from scipy.misc import imresize
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import keras
-from math import sqrt
-
 
 # Number of images to use
 train_size = 100
@@ -56,6 +54,85 @@ def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.
     return image.astype(np.float32) / 255
 
 
+def create_model():
+    # Build the network
+    model = keras.Sequential()
+
+    model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
+
+    model.add(keras.layers.Convolution2D(96, [5, 5], activation='relu'))
+    model.add(keras.layers.MaxPooling2D([2, 2], [2, 2]))
+
+    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu'))
+
+    model.add(keras.layers.Convolution2D(192, [3, 3], activation='relu'))
+
+    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu'))
+
+    model.add(keras.layers.Convolution2D(384, [3, 3], activation='relu'))
+    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
+
+    model.add(keras.layers.Dense(2048, activation='relu'))
+    model.add(keras.layers.Dropout(0.5))
+
+    model.add(keras.layers.Dense(2048, activation='relu'))
+    model.add(keras.layers.Dropout(0.5))
+
+    model.add(keras.layers.Dense(37, activation='relu'))
+
+    sgd = keras.optimizers.SGD(lr=0.1)
+    model.compile(loss='mean_squared_error', optimizer=sgd)
+
+    return model
+
+
+def create_label(dataframe, i, j, name='ShapeLabel', showDistr=False):
+    """
+    Giving a dataframe with probabilities of having a label in each class, reduces the dataframe
+    to one column, where it specifies which is the label of it.
+    :param dataframe: Dataframe where the probability of the values of each class is stored
+    :param i: Index of the first probability of the class we want to create a label from
+    :param j: Index of the last probability of the class we want to create a label from
+    :param name: Name of the new label, optional
+    :param showDistr: Boolean to check the distribution of the label
+    """
+
+    n_probs = j - i + 1
+
+    dataframe = dataframe.drop(dataframe.columns[j+1:], axis=1)
+
+    dataframe = dataframe.drop(dataframe.columns[:i], axis=1)
+    print(dataframe.columns.values)
+
+    dataframe[name] = pd.Series(np.random.random_integers(0, 0), index=dataframe.index)
+
+    max_prob = -float('inf')
+    for img in dataframe.index.values:
+        i, label = 0, 0
+
+        for shape_probs in dataframe.loc[img].values:
+            if shape_probs > max_prob:
+                max_prob = shape_probs
+                label = i
+            i += 1
+
+        dataframe.at[img, name] = label
+
+    dataframe = dataframe.drop(dataframe.columns[:n_probs], axis=1)
+
+    if showDistr:
+        arr = np.zeros(n_probs)
+
+        for label in dataframe.loc[:, name].values:
+            arr[label] += 1
+
+    for n in range(n_probs):
+        print("Label {}: {}%".format(n, round(arr[n]/len(dataframe.loc[:, name].values)*100, 2)))
+
+    return dataframe
+
+
 
 """
 List of names of images
@@ -72,17 +149,21 @@ df.at['100008', 'Class1.1']
 def main():
 
     # Classes for images
-    solutions = "training/training_solutions.csv"
+    solutions = "data/solutions.csv"
 
     # Read data from imagesc
-    df = pd.read_csv(solutions, index_col=0, header=0, nrows=train_size)
+    df = pd.read_csv(solutions, index_col=0, header=0 )#, nrows=train_size)
 
     # Set the indices as labels of type=str
     df.index = df.index.map(str)
 
-    img = mpimg.imread(os.path.join("training/images", "100008.jpg"))[:, :, :channels]
+    img = mpimg.imread(os.path.join("data/training", "100008.jpg"))[:, :, :channels]
 
     new_img = resize_image(img)
+
+
+
+    # df = create_label(df, 5, 6, showDistr=True)
 
     """
     plt.imshow(new_img)
@@ -90,51 +171,16 @@ def main():
     plt.show()
     """
 
-    # Input layer
-    # input_layer = tf.reshape(features["x"], [-1, shape_x, shape_y, channels])
+    network = create_model()
 
-
-    # Build the network
-    model = keras.Sequential()
-
-    model.add(keras.layers.Convolution2D(48,  [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
-    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
-
-    model.add(keras.layers.Convolution2D(96,  [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu'))
-    model.add(keras.layers.MaxPooling2D([2, 2], [2, 2]))
-
-    model.add(keras.layers.Convolution2D(192, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
-
-    model.add(keras.layers.Convolution2D(192, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
-
-    model.add(keras.layers.Convolution2D(384, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
-
-    model.add(keras.layers.Convolution2D(384, [3, 3], input_shape=(shape_x, shape_y, channels), activation='relu'))
-    model.add(keras.layers.MaxPooling2D([3, 3], [3, 3]))
-
-    model.add(keras.layers.Dense(2048, activation='relu'))
-    model.add(keras.layers.Dropout(0.5))
-
-    model.add(keras.layers.Dense(2048, activation='relu'))
-    model.add(keras.layers.Dropout(0.5))
-
-    model.add(keras.layers.Dense(2048, activation='relu'))
-
-    sgd = keras.optimizers.SGD(lr=0.1)
-    def rmse(y_true, y_pred):
-
-        # sqrt((1 / test_size) * [error for error )
-        """
-        :param y_true: Actual value
-        :param y_pred: Predicted value
-        :return: The Root Mean Squared Error of the labels
-        """
-
-    model.compile(loss='mean_squared_error', optimizer=sgd)
 
 
     # shuffle=True because it seems to get better results
-    #model.fit(shuffle=True)
+    # model.fit(shuffle=True)
+
+
+    # Save the model so that Roberto do not have to train the net
+    # model_json = model.to_json()
 
 
 
