@@ -2,23 +2,15 @@ import os
 import numpy as np
 import pandas as pd
 from scipy.misc import imresize
-import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 import matplotlib.image as mpimg
 import keras
-import glob
 
-# Number of images to use
-training_size = 100
-training_path = "data/training/"
-test_size = 100
+data_path = "data/images/"
 
 # Desired shape of input. Initial shape: 424x424
-shape_x, shape_y = 424, 424
+shape_x, shape_y = 212, 212
 channels = 3
-
-
-def ls(path):
-    return glob.glob(os.path.join(path, "*.jpg"))
 
 
 def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.2):
@@ -46,7 +38,7 @@ def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.
     y1 = y0 + crop_height
 
     # Let's crop the image using the random bounding box we built.
-    image = image[y0:y1, x0:x1]
+    image = image[y0:y1, x0:x1, :]
 
     # Let's also flip the image horizontally with 50% probability:
     if np.random.rand() < 0.5:
@@ -57,14 +49,15 @@ def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.
 
     # Finally, let's ensure that the colors are represented as
     # 32-bit floats ranging from 0.0 to 1.0 (for now):
-    return image.astype(np.float32) / 255
+    return image.astype(np.uint8)
 
 
 def create_model():
     # Build the network
     model = keras.Sequential()
 
-    model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu', name='conv1'))
+    model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu',
+                                         name='conv1'))
     model.add(keras.layers.MaxPooling2D([3, 3], [3, 3], name='pool1'))
 
     model.add(keras.layers.Convolution2D(96, [5, 5], activation='relu', name='conv2'))
@@ -89,7 +82,6 @@ def create_model():
 
     model.add(keras.layers.Dense(37, activation='relu', name='dense9'))
 
-
     sgd = keras.optimizers.SGD(lr=0.1)
     model.compile(loss='mean_squared_error', optimizer=sgd)
 
@@ -109,7 +101,7 @@ def create_label(dataframe, i, j, name='ShapeLabel', showDistr=False):
 
     n_probs = j - i + 1
 
-    dataframe = dataframe.drop(dataframe.columns[j+1:], axis=1)
+    dataframe = dataframe.drop(dataframe.columns[j + 1:], axis=1)
 
     dataframe = dataframe.drop(dataframe.columns[:i], axis=1)
     print(dataframe.columns.values)
@@ -137,78 +129,47 @@ def create_label(dataframe, i, j, name='ShapeLabel', showDistr=False):
             arr[label] += 1
 
     for n in range(n_probs):
-        print("Label {}: {}%".format(n, round(arr[n]/len(dataframe.loc[:, name].values)*100, 2)))
+        print("Label {}: {}%".format(n, round(arr[n] / len(dataframe.loc[:, name].values) * 100, 2)))
 
     return dataframe
 
-"""
-List of names of images
-list(df.index.values)
-
-List of names of solution values
-list(df.columns.values)
-
-Value of specific label and column
-df.at['100008', 'Class1.1']
-"""
-
 
 def main():
-
     # Classes for images
     solutions = "data/solutions.csv"
 
     # Read data from imagesc
-    df = pd.read_csv(solutions, index_col=0, header=0 )#, nrows=train_size)
+    df = pd.read_csv(solutions, index_col=0, header=0)  # , nrows=train_size)
 
     # Set the indices as labels of type=str
     df.index = df.index.map(str)
 
-    img = mpimg.imread(os.path.join("data/training", "100008.jpg"))[:, :, :channels]
-    # new_img = resize_image(img)
-
+    total = len(df.index.values)
 
     X, Y = [], []
-    for name in df.index.values[:training_size]:
+    i = 0
+    for name in df.index.values[:]:
         image = mpimg.imread(os.path.join("data/training", name + ".jpg"))[:, :, :channels]
+        image = resize_image(image)
         X.append(image)
-
         Y.append(df.loc[name].values)
+
+        print('Fotos leidas: {0:.2f}%'.format((i / total) * 100), end="\r")
+        i = i + 1
 
     X = np.asarray(X)
     Y = np.asarray(Y)
 
-    network = create_model()
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5)
 
-    network.fit(X, Y, batch_size=int(training_size/4), )
+    model = create_model()
 
+    model.fit(X_train, Y_train, epochs=10, batch_size=32)
 
-
-    # df = create_label(df, 5, 6, showDistr=True)
-
-    """
-    plt.imshow(new_img)
-    plt.axis("off")
-    plt.show()
-    """
-
-
-
-
-
-    # shuffle=True because it seems to get better results
-    # model.fit(shuffle=True)
-
-
-    # Save the model so that Roberto do not have to train the net
-    # model_json = model.to_json()
-
-
-
-
-
-
-
+    model_json = model.to_json()
+    with open("models/model.json", "w") as json_file:
+        json_file.write(model_json)
+    model.save_weights("models/model.h5")
 
 
 if __name__ == '__main__':

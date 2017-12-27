@@ -1,6 +1,7 @@
 .idea/
 data/test/*.jpg
 data/training/*.jpg
+data/images/*.jpg
 
 node_modules/
 
