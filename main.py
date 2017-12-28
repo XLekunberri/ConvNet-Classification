@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.misc import imresize
 from sklearn.model_selection import train_test_split
+import matplotlib.pylab as plt
 import matplotlib.image as mpimg
 import keras
 
@@ -83,55 +84,9 @@ def create_model():
     model.add(keras.layers.Dense(37, activation='relu', name='dense9'))
 
     sgd = keras.optimizers.SGD(lr=0.1)
-    model.compile(loss='mean_squared_error', optimizer=sgd)
+    model.compile(loss='mean_squared_error', optimizer=sgd, metrics=['accuracy'])
 
     return model
-
-
-def create_label(dataframe, i, j, name='ShapeLabel', showDistr=False):
-    """
-    Giving a dataframe with probabilities of having a label in each class, reduces the dataframe
-    to one column, where it specifies which is the label of it.
-    :param dataframe: Dataframe where the probability of the values of each class is stored
-    :param i: Index of the first probability of the class we want to create a label from
-    :param j: Index of the last probability of the class we want to create a label from
-    :param name: Name of the new label, optional
-    :param showDistr: Boolean to check the distribution of the label
-    """
-
-    n_probs = j - i + 1
-
-    dataframe = dataframe.drop(dataframe.columns[j + 1:], axis=1)
-
-    dataframe = dataframe.drop(dataframe.columns[:i], axis=1)
-    print(dataframe.columns.values)
-
-    dataframe[name] = pd.Series(np.random.random_integers(0, 0), index=dataframe.index)
-
-    max_prob = -float('inf')
-    for img in dataframe.index.values:
-        i, label = 0, 0
-
-        for shape_probs in dataframe.loc[img].values:
-            if shape_probs > max_prob:
-                max_prob = shape_probs
-                label = i
-            i += 1
-
-        dataframe.at[img, name] = label
-
-    dataframe = dataframe.drop(dataframe.columns[:n_probs], axis=1)
-
-    if showDistr:
-        arr = np.zeros(n_probs)
-
-        for label in dataframe.loc[:, name].values:
-            arr[label] += 1
-
-    for n in range(n_probs):
-        print("Label {}: {}%".format(n, round(arr[n] / len(dataframe.loc[:, name].values) * 100, 2)))
-
-    return dataframe
 
 
 def main():
@@ -139,37 +94,65 @@ def main():
     solutions = "data/solutions.csv"
 
     # Read data from imagesc
-    df = pd.read_csv(solutions, index_col=0, header=0)  # , nrows=train_size)
+    df = pd.read_csv(solutions, index_col=0, header=0)
 
     # Set the indices as labels of type=str
     df.index = df.index.map(str)
 
     total = len(df.index.values)
 
-    X, Y = [], []
+    x, y = [], []
     i = 0
     for name in df.index.values[:]:
-        image = mpimg.imread(os.path.join("data/training", name + ".jpg"))[:, :, :channels]
+        image = mpimg.imread(os.path.join(data_path, name + ".jpg"))[:, :, :channels]
         image = resize_image(image)
-        X.append(image)
-        Y.append(df.loc[name].values)
+        x.append(image)
+        y.append(df.loc[name].values)
 
-        print('Fotos leidas: {0:.2f}%'.format((i / total) * 100), end="\r")
+        print('Loading photos... {0:.2f}%'.format((i / total) * 100), end="\r")
         i = i + 1
 
-    X = np.asarray(X)
-    Y = np.asarray(Y)
+    print("\nPhotos loaded: {}\n".format(i))
+    x = np.asarray(x)
+    y = np.asarray(y)
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.5)
 
     model = create_model()
 
-    model.fit(X_train, Y_train, epochs=10, batch_size=32)
+    load = input("Load a trained model? [y/N]")
 
-    model_json = model.to_json()
-    with open("models/model.json", "w") as json_file:
-        json_file.write(model_json)
-    model.save_weights("models/model.h5")
+    if load.lower() == 'y':
+        json_file = open('trained_model/model.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+
+        loaded_model = keras.models.model_from_json(loaded_model_json)
+        loaded_model.load_weights("trained_model/weights.h5")
+
+        sgd = keras.optimizers.SGD(lr=0.1)
+        loaded_model.compile(loss='mean_squared_error', optimizer=sgd, metrics=['accuracy'])
+
+        scores = loaded_model.evaluate(x_test, y_test, batch_size=32)
+        print("\nModel accuracy: {0:.2f}%".format(scores[1] * 100))
+    else:
+        hist = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=10, batch_size=32)
+
+        plt.figure(figsize=(12, 8))
+        plt.plot(hist.epoch, hist.history['loss'], label='Test')
+        plt.plot(hist.epoch, hist.history['val_loss'], label='Validation', linestyle='--')
+        plt.xlabel("Epochs")
+        plt.ylabel("MSE")
+        plt.legend()
+        plt.savefig('trained_model/histogram.png')
+
+        model_json = model.to_json()
+        with open("trained_model/model.json", "w") as json_file:
+            json_file.write(model_json)
+        model.save_weights("trained_model/weights.h5")
+
+        scores = model.evaluate(x_test, y_test, batch_size=32)
+        print("\nModel accuracy: {0:.2f}%".format(scores[1] * 100))
 
 
 if __name__ == '__main__':
