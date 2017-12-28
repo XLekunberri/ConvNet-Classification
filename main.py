@@ -7,8 +7,6 @@ import matplotlib.pylab as plt
 import matplotlib.image as mpimg
 import keras
 
-data_path = "data/images/"
-
 # Desired shape of input. Initial shape: 424x424
 shape_x, shape_y = 212, 212
 channels = 3
@@ -54,7 +52,10 @@ def resize_image(image, target_width=shape_x, target_height=shape_y, max_zoom=0.
 
 
 def create_model():
-    # Build the network
+    """
+    It builds a Convolutional Neural Network using the keras library
+    :return: A keras model
+    """
     model = keras.Sequential()
 
     model.add(keras.layers.Convolution2D(48, [5, 5], input_shape=(shape_x, shape_y, channels), activation='relu',
@@ -78,8 +79,7 @@ def create_model():
 
     model.add(keras.layers.Dense(2048, activation='relu', name='dense8'))
     model.add(keras.layers.Dropout(0.5, name='drop8'))
-
-    model.add(keras.layers.Flatten())
+    model.add(keras.layers.Flatten(name='flat8'))
 
     model.add(keras.layers.Dense(37, activation='relu', name='dense9'))
 
